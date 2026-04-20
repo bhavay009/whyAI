@@ -75,12 +75,10 @@ const generateFollowUp = async ({ history, answer }) => {
     content: msg.content
   }));
 
-  // Ensure last message is the current user answer
   if (messages[messages.length - 1]?.role !== 'user') {
     messages.push({ role: 'user', content: answer });
   }
 
-  // System instruction
   messages.unshift({
     role: 'system',
     content: `You are a technical interviewer conducting a project-based interview. 
@@ -90,6 +88,76 @@ Do not repeat previous questions.`
   });
 
   return await chat(messages);
+};
+
+/**
+ * Adaptive follow-up: cycles through WHY / EDGE CASES / ALTERNATIVES
+ * based on the follow-up depth (0 = why, 1 = edge cases, 2 = alternatives)
+ * projectContext: { role, project } from the session
+ */
+const generateAdaptiveFollowUp = async ({ history, answer, followUpDepth = 0, projectContext = {} }) => {
+  const { role = 'Software Engineer', project = '' } = projectContext;
+
+  const focusAreas = [
+    {
+      label: 'why',
+      instruction: `Ask specifically about the REASONING behind the decision mentioned in the candidate's last answer.
+      Ground your question in the candidate's project: "${project}".
+      Focus on: why they chose this specific approach for THIS project, what constraints or goals drove the decision.
+      Keep it to one sharp, project-specific question.`
+    },
+    {
+      label: 'edge_cases',
+      instruction: `Ask about EDGE CASES or failure scenarios directly related to what the candidate built in: "${project}".
+      Focus on: real-world failure modes for their specific stack or architecture — load spikes, bad user input, API failures, race conditions.
+      Keep it to one sharp, project-specific question.`
+    },
+    {
+      label: 'alternatives',
+      instruction: `Ask about ALTERNATIVE APPROACHES the candidate could have used in their project: "${project}".
+      Focus on: specific technologies, libraries, or architectural patterns that could have achieved the same goal differently,
+      and what trade-offs they would introduce in THIS project's context.
+      Keep it to one sharp, project-specific question.`
+    }
+  ];
+
+  const focus = focusAreas[followUpDepth % focusAreas.length];
+
+  if (!groq) {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    const mockResponses = {
+      why: `Why specifically did you choose that approach for ${project || 'this project'} over the alternatives?`,
+      edge_cases: `How does your ${project || 'project'} implementation handle edge cases like network failures or malformed input?`,
+      alternatives: `What alternative technologies did you consider for ${project || 'this project'}, and why did you rule them out?`
+    };
+    return { question: mockResponses[focus.label], type: focus.label };
+  }
+
+  const messages = history.map(msg => ({
+    role: msg.role === 'ai' ? 'assistant' : 'user',
+    content: msg.content
+  }));
+
+  if (messages[messages.length - 1]?.role !== 'user') {
+    messages.push({ role: 'user', content: answer });
+  }
+
+  messages.unshift({
+    role: 'system',
+    content: `You are a senior technical interviewer conducting a project-based interview for a ${role} role.
+The candidate is being interviewed specifically about their project: "${project}".
+
+Your task: ${focus.instruction}
+
+CRITICAL RULES:
+- Every question MUST be directly related to the candidate's described project: "${project}"
+- Do NOT ask generic interview questions
+- Reference specific technologies, decisions, or components from their answers
+- Respond with ONLY the question — no preamble, no "Great answer!", no explanation.`
+  });
+
+  const question = await chat(messages);
+  return { question: question.trim(), type: focus.label };
 };
 
 const extractResumeData = async (text) => {
@@ -150,5 +218,6 @@ module.exports = {
   generateInterviewQuestions,
   generateInitialQuestion,
   generateFollowUp,
+  generateAdaptiveFollowUp,
   extractResumeData
 };

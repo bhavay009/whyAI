@@ -2,6 +2,13 @@ const aiService = require('../services/aiService');
 const sessionStore = require('../services/sessionStore');
 const crypto = require('crypto');
 
+// Map of follow-up types to user-friendly labels
+const FOLLOW_UP_LABELS = {
+  why: '🔍 Digging Deeper',
+  edge_cases: '⚠️ Edge Cases',
+  alternatives: '🔀 Alternatives'
+};
+
 const generateQuestions = async (req, res) => {
   try {
     const { role, project, experienceLevel } = req.body;
@@ -95,8 +102,56 @@ const chat = async (req, res) => {
   }
 };
 
+const followUp = async (req, res) => {
+  try {
+    const { history, answer, sessionId } = req.body;
+
+    if (!sessionId || !answer) {
+      return res.status(400).json({ error: 'Session ID and answer are required.' });
+    }
+
+    const session = await sessionStore.getSession(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found.' });
+    }
+
+    // Save user turn to transcript
+    session.transcript.push({ role: 'user', content: answer, timestamp: new Date().toISOString() });
+
+    const followUpDepth = session.followUpCount % 3; // cycles: why -> edge_cases -> alternatives
+    const projectContext = { role: session.role, project: session.project };
+    const { question, type } = await aiService.generateAdaptiveFollowUp({
+      history,
+      answer,
+      followUpDepth,
+      projectContext
+    });
+
+    session.followUpCount += 1;
+    session.transcript.push({
+      role: 'ai',
+      content: question,
+      followUpType: type,
+      timestamp: new Date().toISOString()
+    });
+
+    await sessionStore.saveSession(sessionId, session);
+
+    res.json({
+      message: question,
+      followUpType: type,
+      followUpLabel: FOLLOW_UP_LABELS[type] || 'Follow-up',
+      followUpDepth: session.followUpCount
+    });
+  } catch (error) {
+    console.error('Error generating follow-up:', error);
+    res.status(500).json({ error: 'Failed to generate follow-up question.' });
+  }
+};
+
 module.exports = {
   generateQuestions,
   startInterview,
-  chat
+  chat,
+  followUp
 };

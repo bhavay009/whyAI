@@ -102,6 +102,51 @@
   flex-direction: row-reverse;
 }
 
+.bubble-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+/* Follow-up type badges */
+.follow-up-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  width: fit-content;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.badge-why {
+  background: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.badge-edge {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-alt {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-transition {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
 .avatar {
   width: 36px;
   height: 36px;
@@ -142,12 +187,75 @@
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
 }
 
+.chat-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.hint-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: #a78bfa;
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  border-bottom: none;
+  padding: 0.4rem 1rem;
+  border-radius: 12px 12px 0 0;
+}
+
+.hint-skip {
+  background: none;
+  border: none;
+  color: #c4b5fd;
+  cursor: pointer;
+  font-size: 0.78rem;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.hint-skip:hover { color: white; }
+
 .chat-input-area {
   display: flex;
   gap: 0.75rem;
   padding: 1rem;
   align-items: flex-end;
 }
+
+.input-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.followup-btn {
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: #a78bfa;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.followup-btn:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.25);
+  transform: translateY(-1px);
+}
+
+.followup-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 
 .chat-input {
   flex: 1;
