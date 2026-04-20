@@ -24,13 +24,14 @@ const InterviewSetup = () => {
     setLoading(true);
     try {
       const response = await axios.post('http://localhost:3001/api/interview/generate-questions', formData);
-      const questions = response.data.questions;
+      const { questions, sessionId } = response.data;
       
       navigate('/session', { 
         state: { 
           config: formData, 
           questions: questions,
-          initialMessage: questions[0] 
+          initialMessage: questions[0],
+          sessionId: sessionId
         } 
       });
     } catch (error) {

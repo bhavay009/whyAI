@@ -68,6 +68,7 @@ const ResumeUpload = () => {
             type="file" 
             ref={fileInputRef} 
             onChange={handleFileChange} 
+            onClick={(e) => e.stopPropagation()} // Prevent bubble to dropzone
             accept=".pdf" 
             style={{ display: 'none' }} 
           />
@@ -78,7 +79,11 @@ const ResumeUpload = () => {
           {file && (
             <button 
               className="primary-btn" 
-              onClick={(e) => { e.stopPropagation(); handleUpload(); }}
+              onClick={(e) => { 
+                e.preventDefault();
+                e.stopPropagation(); 
+                handleUpload(); 
+              }}
               style={{ marginTop: '2rem' }}
               disabled={loading}
             >

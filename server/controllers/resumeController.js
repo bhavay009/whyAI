@@ -12,16 +12,20 @@ const uploadResume = async (req, res) => {
     }
 
     // Extract text from the PDF buffer
+    console.log('Starting PDF extraction...');
     const pdfData = await pdfParse(req.file.buffer);
     const rawText = pdfData.text;
+    console.log('PDF text extracted successfully, length:', rawText.length);
 
     // Call the AI Service to process and return JSON
+    console.log('Calling AI service for extraction...');
     const extractedData = await aiService.extractResumeData(rawText);
+    console.log('AI extraction complete.');
 
     res.json(extractedData);
   } catch (error) {
-    console.error('Error extracting resume data:', error);
-    res.status(500).json({ error: 'Failed to process the resume.' });
+    console.error('RESUME_CONTROLLER_ERROR:', error);
+    res.status(500).json({ error: 'Failed to process the resume.', details: error.message });
   }
 };
 

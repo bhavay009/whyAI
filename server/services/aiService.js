@@ -1,138 +1,149 @@
-const { GoogleGenerativeAI } = require("@google/genai");
+const Groq = require('groq-sdk');
 
-// Initialize Gemini API
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
+// Initialize Groq API
+const groq = process.env.GROQ_API_KEY
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY })
+  : null;
+
+const MODEL = 'llama-3.1-8b-instant';
+
+// Helper to call Groq chat completion
+const chat = async (messages) => {
+  const response = await groq.chat.completions.create({
+    model: MODEL,
+    messages,
+    temperature: 0.7,
+  });
+  return response.choices[0].message.content;
+};
 
 const generateInterviewQuestions = async ({ role, project, experienceLevel }) => {
-  if (!genAI) {
-    console.warn("GEMINI_API_KEY not found. Using mock questions.");
+  if (!groq) {
+    console.warn('GROQ_API_KEY not found. Using mock questions.');
     return [
-      `How did you handle the state management in your ${project}?`,
-      `Can you explain the architectural decisions you made for the backend of ${project}?`,
+      `How did you handle state management in your ${project}?`,
+      `Can you explain the architectural decisions you made for ${project}?`,
       `What were the biggest technical challenges you faced while building ${project}?`,
-      `How did you ensure the scalability of the ${project}?`,
-      `If you were to rebuild ${project} today, what technologies would you choose and why?`
+      `How did you ensure the scalability of ${project}?`,
+      `If you were to rebuild ${project} today, what would you change and why?`
     ];
   }
 
-  try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const prompt = `You are an expert technical interviewer.
+Generate exactly 5 specific interview questions for a ${role} position with ${experienceLevel} experience.
+The questions MUST be based ONLY on the following project details:
+"${project}"
 
-    const prompt = `
-      You are an expert technical interviewer. 
-      Generate 5 specific interview questions for a ${role} position with ${experienceLevel} experience.
-      The questions MUST be based ONLY on the following project details provided by the candidate:
-      "${project}"
+Guidelines:
+- Avoid generic questions like "What was your role?" or "What did you learn?"
+- Focus on implementation details, technical decisions, and architecture choices
+- Each question should be challenging and specific to the project's tech stack or domain
+- Return ONLY a JSON array of 5 strings, no extra text
 
-      Guidelines:
-      - Avoid generic questions (e.g., "What was your role?", "What did you learn?").
-      - Focus on implementation details, technical decisions, and architecture.
-      - Each question should be challenging and specific to the project's tech stack or domain.
-      - Return ONLY the 5 questions as a JSON array of strings.
-    `;
+Example format: ["Question 1?", "Question 2?", "Question 3?", "Question 4?", "Question 5?"]`;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-    
-    // Attempt to parse JSON from the response
-    const jsonMatch = text.match(/\[.*\]/s);
-    if (jsonMatch) {
+  const text = await chat([{ role: 'user', content: prompt }]);
+
+  const jsonMatch = text.match(/\[[\s\S]*\]/);
+  if (jsonMatch) {
+    try {
       return JSON.parse(jsonMatch[0]);
+    } catch (e) {
+      // fall through to line split
     }
-    
-    // Fallback split if JSON parsing fails
-    return text.split('\n').filter(q => q.trim().length > 0).slice(0, 5);
-  } catch (error) {
-    console.error("Error generating questions with Gemini:", error);
-    throw error;
   }
+  return text.split('\n').filter(q => q.trim().length > 5).slice(0, 5);
 };
 
-const generateInitialQuestion = async ({ role, project, experienceLevel }) => {
-  // We'll now use generateInterviewQuestions and take the first one
-  const questions = await generateInterviewQuestions({ role, project, experienceLevel });
+const generateInitialQuestion = async (opts) => {
+  const questions = await generateInterviewQuestions(opts);
   return questions[0];
 };
 
 const generateFollowUp = async ({ history, answer }) => {
-  if (!genAI) {
-    // Simulate AI delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
+  if (!groq) {
+    await new Promise(resolve => setTimeout(resolve, 1000));
     const depth = history.length;
     if (depth < 4) {
-      return `That's an interesting approach. You mentioned: "${answer.substring(0, 30)}...". What led you to make that specific design choice?`;
-    } else {
-      return `Can you dive a bit deeper into the trade-offs there? How did it impact the performance?`;
+      return `Interesting! You mentioned "${answer.substring(0, 40)}...". What led you to that specific design choice?`;
     }
+    return `Can you dive deeper into the trade-offs involved? How did it affect performance or maintainability?`;
   }
 
-  try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    
-    const chatHistory = history.map(msg => ({
-      role: msg.role === 'ai' ? 'model' : 'user',
-      parts: [{ text: msg.content }]
-    }));
+  const messages = history.map(msg => ({
+    role: msg.role === 'ai' ? 'assistant' : 'user',
+    content: msg.content
+  }));
 
-    const chat = model.startChat({
-      history: chatHistory.slice(0, -1), // History without the latest response
-    });
-
-    const result = await chat.sendMessage(answer);
-    const response = await result.response;
-    return response.text();
-  } catch (error) {
-    console.error("Error generating follow-up with Gemini:", error);
-    return "I'm having trouble coming up with the next question. Could you tell me more about that?";
+  // Ensure last message is the current user answer
+  if (messages[messages.length - 1]?.role !== 'user') {
+    messages.push({ role: 'user', content: answer });
   }
+
+  // System instruction
+  messages.unshift({
+    role: 'system',
+    content: `You are a technical interviewer conducting a project-based interview. 
+Ask a focused follow-up question based on the candidate's last answer.
+Keep your response to 1-2 sentences max — just the follow-up question.
+Do not repeat previous questions.`
+  });
+
+  return await chat(messages);
 };
 
 const extractResumeData = async (text) => {
-  if (!genAI) {
-    await new Promise(resolve => setTimeout(resolve, 2000));
+  if (!groq) {
+    console.warn('GROQ_API_KEY not set. Returning mock resume data.');
+    await new Promise(resolve => setTimeout(resolve, 1000));
     return {
       projects: [
         {
-          name: "E-Commerce Platform",
-          description: "Built a fully functional e-commerce platform using React, Node.js, and Stripe.",
-          technologies: ["React", "Stripe", "Node.js"]
+          name: 'E-Commerce Platform',
+          description: 'Built a fully functional e-commerce platform using React, Node.js, and Stripe.',
+          technologies: ['React', 'Stripe', 'Node.js']
         },
         {
-          name: "Task Management App",
-          description: "Developed a Kanban board with real-time updates.",
-          technologies: ["Vue.js", "Firebase"]
+          name: 'Task Management App',
+          description: 'Developed a Kanban board with real-time updates.',
+          technologies: ['Vue.js', 'Firebase']
         }
       ],
-      technologies: ["React", "Vue.js", "Node.js", "Firebase", "Stripe"],
-      skills: ["Frontend Development", "Payment Integration", "Real-time Databases", "Agile methodologies"]
+      technologies: ['React', 'Vue.js', 'Node.js', 'Firebase', 'Stripe'],
+      skills: ['Frontend Development', 'Payment Integration', 'Real-time Databases']
     };
   }
 
-  try {
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
-      generationConfig: { responseMimeType: "application/json" }
-    });
+  const prompt = `Extract structured information from the following resume text.
+Return ONLY a valid JSON object with this exact structure (no extra text):
+{
+  "projects": [
+    {
+      "name": "Project Name",
+      "description": "Brief description of what it does and your role",
+      "technologies": ["Tech1", "Tech2"]
+    }
+  ],
+  "technologies": ["list", "of", "all", "technologies"],
+  "skills": ["list", "of", "skills"]
+}
 
-    const prompt = `
-      Extract key information from the following resume text.
-      Return a JSON object with:
-      1. projects: An array of objects each with "name", "description", and "technologies" (array).
-      2. technologies: A flat array of all mentioned technologies.
-      3. skills: A flat array of mentioned soft and hard skills.
+Resume Text:
+${text}`;
 
-      Resume Text:
-      ${text}
-    `;
+  const responseText = await chat([{ role: 'user', content: prompt }]);
 
-    const result = await model.generateContent(prompt);
-    return JSON.parse(result.response.text());
-  } catch (error) {
-    console.error("Error extracting resume data:", error);
-    throw error;
+  // Extract JSON from the response
+  const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      return JSON.parse(jsonMatch[0]);
+    } catch (e) {
+      console.error('Failed to parse Groq JSON response:', e.message);
+      throw new Error('AI returned malformed JSON');
+    }
   }
+  throw new Error('No JSON found in AI response');
 };
 
 module.exports = {
