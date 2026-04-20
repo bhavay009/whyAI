@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import './InterviewSetup.css';
 
 const InterviewSetup = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { prefilledProject } = location.state || {};
+
   const [formData, setFormData] = useState({
     role: '',
     experienceLevel: 'Mid',
-    project: ''
+    project: prefilledProject ? `${prefilledProject.name}: ${prefilledProject.description}` : ''
   });
   const [loading, setLoading] = useState(false);
 
@@ -20,11 +23,19 @@ const InterviewSetup = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost:3001/api/interview/start', formData);
-      navigate('/session', { state: { config: formData, initialMessage: response.data.message } });
+      const response = await axios.post('http://localhost:3001/api/interview/generate-questions', formData);
+      const questions = response.data.questions;
+      
+      navigate('/session', { 
+        state: { 
+          config: formData, 
+          questions: questions,
+          initialMessage: questions[0] 
+        } 
+      });
     } catch (error) {
       console.error('Error starting interview:', error);
-      alert('Failed to connect to the backend simulator. Is the server running on port 3001?');
+      alert('Failed to connect to the backend simulator. Is the server running on port 3001 and is GEMINI_API_KEY configured?');
     } finally {
       setLoading(false);
     }

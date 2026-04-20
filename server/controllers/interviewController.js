@@ -1,5 +1,21 @@
 const aiService = require('../services/aiService');
 
+const generateQuestions = async (req, res) => {
+  try {
+    const { role, project, experienceLevel } = req.body;
+
+    if (!role || !project) {
+      return res.status(400).json({ error: 'Role and project details are required.' });
+    }
+
+    const questions = await aiService.generateInterviewQuestions({ role, project, experienceLevel });
+    res.json({ questions });
+  } catch (error) {
+    console.error('Error generating questions:', error);
+    res.status(500).json({ error: 'Failed to generate interview questions.' });
+  }
+};
+
 const startInterview = async (req, res) => {
   try {
     const { role, project, experienceLevel } = req.body;
@@ -33,6 +49,7 @@ const chat = async (req, res) => {
 };
 
 module.exports = {
+  generateQuestions,
   startInterview,
   chat
 };
