@@ -149,9 +149,57 @@ const followUp = async (req, res) => {
   }
 };
 
+const evaluateAnswer = async (req, res) => {
+  try {
+    const { question, answer, sessionId } = req.body;
+
+    if (!question || !answer || !sessionId) {
+      return res.status(400).json({ error: 'question, answer, and sessionId are required.' });
+    }
+
+    const session = await sessionStore.getSession(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found.' });
+    }
+
+    const projectContext = { role: session.role, project: session.project };
+    const evaluation = await aiService.evaluateAnswer({ question, answer, projectContext });
+
+    res.json(evaluation);
+  } catch (error) {
+    console.error('Error evaluating answer:', error);
+    res.status(500).json({ error: 'Failed to evaluate answer.' });
+  }
+};
+
+const improveAnswer = async (req, res) => {
+  try {
+    const { question, answer, sessionId } = req.body;
+
+    if (!question || !answer || !sessionId) {
+      return res.status(400).json({ error: 'question, answer, and sessionId are required.' });
+    }
+
+    const session = await sessionStore.getSession(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found.' });
+    }
+
+    const projectContext = { role: session.role, project: session.project };
+    const result = await aiService.improveAnswer({ question, answer, projectContext });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error improving answer:', error);
+    res.status(500).json({ error: 'Failed to improve answer.' });
+  }
+};
+
 module.exports = {
   generateQuestions,
   startInterview,
   chat,
-  followUp
+  followUp,
+  evaluateAnswer,
+  improveAnswer
 };

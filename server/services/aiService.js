@@ -214,10 +214,104 @@ ${text}`;
   throw new Error('No JSON found in AI response');
 };
 
+/**
+ * Evaluate an interview answer: scores depth, clarity, reasoning
+ * and returns strengths + weaknesses
+ */
+const evaluateAnswer = async ({ question, answer, projectContext = {} }) => {
+  const { role = 'Software Engineer', project = '' } = projectContext;
+
+  if (!groq) {
+    return {
+      scores: { depth: 7, clarity: 8, reasoning: 6, overall: 7 },
+      strengths: ['Clear explanation of the approach', 'Good technical terminology'],
+      weaknesses: ['Could mention specific trade-offs', 'Missing quantitative impact'],
+      summary: 'A solid answer that demonstrates familiarity with the topic but could go deeper on reasoning.'
+    };
+  }
+
+  const prompt = `You are evaluating a technical interview answer for a ${role} role about the project: "${project}".
+
+QUESTION ASKED:
+${question}
+
+CANDIDATE'S ANSWER:
+${answer}
+
+Evaluate the answer strictly and return ONLY a valid JSON object with this exact structure:
+{
+  "scores": {
+    "depth": <integer 1-10>,
+    "clarity": <integer 1-10>,
+    "reasoning": <integer 1-10>,
+    "overall": <integer 1-10>
+  },
+  "strengths": ["<specific strength 1>", "<specific strength 2>"],
+  "weaknesses": ["<specific weakness 1>", "<specific weakness 2>"],
+  "summary": "<2 sentence overall assessment>"
+}
+
+Scoring guide:
+- depth: How deeply did they explain the technical implementation? (1=surface level, 10=expert depth)
+- clarity: How clearly and concisely was the answer structured? (1=confusing, 10=crystal clear)
+- reasoning: Did they justify their decisions with solid reasoning? (1=no reasoning, 10=excellent reasoning)
+- overall: Weighted average considering all factors
+
+Be honest and specific. Reference the actual content of their answer.`;
+
+  const text = await chat([{ role: 'user', content: prompt }]);
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      return JSON.parse(jsonMatch[0]);
+    } catch (e) {
+      throw new Error('Failed to parse evaluation JSON');
+    }
+  }
+  throw new Error('No evaluation JSON in response');
+};
+
+/**
+ * Rewrite a candidate's answer in a cleaner, more structured format
+ */
+const improveAnswer = async ({ question, answer, projectContext = {} }) => {
+  const { role = 'Software Engineer', project = '' } = projectContext;
+
+  if (!groq) {
+    return {
+      improvedAnswer: `Here's a more structured version of the answer:\n\n**Approach:** ${answer}\n\n**Technical reasoning:** This approach was chosen because it best fits the project's scalability requirements.\n\n**Impact:** This resulted in improved performance and maintainability of the codebase.`
+    };
+  }
+
+  const prompt = `You are a technical writing coach helping a ${role} candidate improve their interview answer about the project: "${project}".
+
+QUESTION:
+${question}
+
+ORIGINAL ANSWER:
+${answer}
+
+Rewrite this answer in a clear, well-structured format that:
+1. Opens with a direct statement of the approach taken
+2. Explains the technical reasoning behind the decision
+3. Mentions specific technologies or patterns used
+4. Quantifies impact or outcome where possible
+5. Briefly acknowledges trade-offs or alternatives considered
+
+Keep the same meaning and facts — just structure and articulate it better.
+Write in first person. Be concise (4-6 sentences max).
+Return ONLY the improved answer text — no preamble, no labels.`;
+
+  const improved = await chat([{ role: 'user', content: prompt }]);
+  return { improvedAnswer: improved.trim() };
+};
+
 module.exports = {
   generateInterviewQuestions,
   generateInitialQuestion,
   generateFollowUp,
   generateAdaptiveFollowUp,
+  evaluateAnswer,
+  improveAnswer,
   extractResumeData
 };
